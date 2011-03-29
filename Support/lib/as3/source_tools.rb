@@ -101,15 +101,59 @@ module SourceTools
 
   end
 
+  # Loads all paths found in the catalogs of swcs within this project
+  # that contain the requested word
+  # @author jeremy.ruppel
+  # @since 07 May 2010
+  def self.search_swc_paths(word)
+    require "rubygems"
+    require "nokogiri"
+    require "zip/zip"
+
+    best_paths = []
+    package_paths = []
+
+    Dir.glob( File.join( ENV['TM_PROJECT_DIRECTORY'], "**/*.swc" ) ).each do |swc|
+
+      Zip::ZipFile.open( swc ) do |zip|
+
+        cat = Nokogiri::XML( zip.read( 'catalog.xml' ) )
+        cat.remove_namespaces!
+        cat.xpath( '//swc/libraries/library/script' ).each do |s|
+
+          path = s[ 'name' ].gsub( '/', '.' )
+
+          next if path[ /flash_display_Sprite/ ]
+          next unless path =~ /#{word}/
+
+          if path =~ /(^|\.)#{word}$/
+            best_paths << path
+          else
+            package_paths << path
+          end
+
+        end
+      end
+    end
+
+    { :exact_matches => best_paths, :partial_matches => package_paths }
+
+  end
   # Loads both bundle and project paths.
   #
   def self.search_all_paths(word)
 
     pp = search_project_paths(word)
     bp = search_bundle_paths(word)
-
-    e = pp[:exact_matches] + bp[:exact_matches]
-    p = pp[:partial_matches] + bp[:partial_matches]
+    # @author jeremy.ruppel
+    # @since 07 May 2010
+    sp = search_swc_paths(word)
+                                                  # @author jeremy.ruppel
+                                                  # @since 07 May 2010
+    e = pp[:exact_matches] + bp[:exact_matches] + sp[:exact_matches]
+                                                      # @author jeremy.ruppel
+                                                      # @since 07 May 2010
+    p = pp[:partial_matches] + bp[:partial_matches] + sp[:partial_matches]
 
     e.uniq!
     p.uniq!
